@@ -1,12 +1,93 @@
-import { getInstrument, savePosition, deletePosition, addJournal, updateJournal, deleteJournal } from '../db.js';
+import { getInstrument, getEtfProfile, saveEtfProfile, savePosition, deletePosition, addJournal, updateJournal, deleteJournal } from '../db.js';
+import { quote, workerConfigured } from '../api.js';
 import { h, mount, toast, inputNumber, fmtNum, fmtMoney, fmtEur, fmtDate, fmtDateTime, KIND_LABELS } from '../ui.js';
 
 const ISIN_RE = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
 
+/** Tickerveld met controleknop (vraagt de koers op via de Worker). */
+function tickerField(symbol) {
+  const input = h('input', { id: 'f-symbol', name: 'symbol', value: symbol ?? '', placeholder: 'bv. VUAA.DE', autocapitalize: 'characters' });
+  const result = h('small', { class: 'muted' }, symbol ? '' : 'Leeg laten: wordt automatisch gezocht bij “Koersen verversen”.');
+  const check = h('button', { type: 'button', disabled: !workerConfigured, onclick: async () => {
+    const s = input.value.trim();
+    if (!s) return;
+    result.textContent = 'Controleren…';
+    try {
+      const q = await quote(s);
+      result.textContent = `${q.name ?? q.symbol} · ${q.exchange} · ${fmtMoney(q.price, q.currency)}${q.hasHistory ? '' : ' · let op: geen historie'}`;
+    } catch (e) { result.textContent = `Niet gevonden: ${e.message}`; }
+  } }, 'Controleer');
+  return h('div', { class: 'field' },
+    h('label', { for: 'f-symbol' }, 'Ticker bij koersbron (Yahoo)'),
+    h('div', { class: 'inline' }, input, check),
+    result);
+}
+
+// ---- ETF-profiel: tekstformaat zodat bewerken simpel blijft ----
+const pctLines = obj => Object.entries(obj ?? {}).map(([k, v]) => `${k}: ${String(v).replace('.', ',')}`).join('\n');
+const holdingLines = arr => (arr ?? []).map(x => [x.name, x.ticker ?? '', String(x.weight_pct ?? '').replace('.', ',')].join('; ')).join('\n');
+
+function parsePctLines(text, label) {
+  const out = {};
+  for (const [n, line] of text.split('\n').entries()) {
+    if (!line.trim()) continue;
+    const m = line.match(/^(.+?)[:;]\s*([\d.,]+)\s*%?\s*$/);
+    if (!m) throw new Error(`${label}, regel ${n + 1}: gebruik “Naam: percentage”`);
+    out[m[1].trim()] = inputNumber(m[2]);
+  }
+  return out;
+}
+function parseHoldings(text) {
+  return text.split('\n').filter(l => l.trim()).map((line, n) => {
+    const [name, ticker, w] = line.split(';').map(s => s?.trim());
+    const weight = inputNumber(w);
+    if (!name || weight == null || Number.isNaN(weight)) throw new Error(`Holdings, regel ${n + 1}: gebruik “Naam; Ticker; Gewicht”`);
+    return { name, ticker: ticker || null, weight_pct: weight };
+  });
+}
+
+function etfProfileSection(instrumentId, profile, reload) {
+  const ta = (name, value, rows, placeholder) => h('textarea', { name, rows, placeholder }, value);
+  const form = h('form', { class: 'stack', onsubmit: async e => {
+    e.preventDefault();
+    const f = form.elements;
+    try {
+      await saveEtfProfile(instrumentId, {
+        theme: f.theme.value.trim() || null,
+        holdings: parseHoldings(f.holdings.value),
+        sectors: parsePctLines(f.sectors.value, 'Sectoren'),
+        regions: parsePctLines(f.regions.value, 'Regio’s'),
+        currencies: parsePctLines(f.currencies.value, 'Valuta'),
+        source: 'manual',
+      });
+      toast('ETF-profiel opgeslagen');
+      reload();
+    } catch (err) { toast(err.message, 'error'); }
+  } },
+    h('div', { class: 'field' }, h('label', {}, 'Thema'), h('input', { name: 'theme', value: profile?.theme ?? '', placeholder: 'bv. Uranium en kernenergie' })),
+    h('div', { class: 'field' }, h('label', {}, 'Belangrijkste onderliggende bedrijven'),
+      ta('holdings', holdingLines(profile?.holdings), 6, 'NVIDIA; NVDA; 7,5\nApple; AAPL; 6,8'),
+      h('small', { class: 'muted' }, 'Per regel: Naam; Ticker; Gewicht in %')),
+    h('div', { class: 'grid-3' },
+      h('div', { class: 'field' }, h('label', {}, 'Sectoren (%)'), ta('sectors', pctLines(profile?.sectors), 6, 'Technologie: 32\nFinancieel: 13')),
+      h('div', { class: 'field' }, h('label', {}, 'Regio’s (%)'), ta('regions', pctLines(profile?.regions), 6, 'Noord-Amerika: 100')),
+      h('div', { class: 'field' }, h('label', {}, 'Valuta onderliggend (%)'), ta('currencies', pctLines(profile?.currencies), 6, 'USD: 100'))),
+    h('div', { class: 'form-actions' }, h('button', { type: 'submit', class: 'primary' }, 'Profiel opslaan')),
+  );
+  return h('section', { class: 'card' },
+    h('h2', {}, 'ETF-profiel'),
+    h('p', { class: 'muted small' },
+      profile ? `Bron: ${profile.source === 'claude' ? 'voorgesteld door Claude, daarna te bewerken' : 'handmatig'} · bijgewerkt ${fmtDate(profile.updated_at)}. ` : '',
+      'Gebruikt voor spreiding, overlap en de krant. Claude kan dit straks één keer voorstellen.'),
+    form);
+}
+
 /** Detail- en bewerkpagina. id = null voor een nieuwe positie. */
 export async function positionView(root, id) {
   mount(root, h('p', { class: 'muted' }, 'Laden…'));
-  const data = id ? await getInstrument(id) : { instrument: { currency: 'EUR', kind: 'etf' }, position: null, journal: [], transactions: [] };
+  const data = id
+    ? { ...(await getInstrument(id)), profile: await getEtfProfile(id) }
+    : { instrument: { currency: 'EUR', kind: 'etf' }, position: null, journal: [], transactions: [], profile: null };
   const { instrument: ins, position: pos } = data;
   const isNew = !id;
 
@@ -21,7 +102,7 @@ export async function positionView(root, id) {
   const form = h('form', { class: 'card grid-form', onsubmit: onSave },
     field('Naam', 'name', ins.name, { required: true }),
     field('ISIN', 'isin', ins.isin?.startsWith('MANUAL-') ? '' : ins.isin, { placeholder: 'bv. IE00BFMXXD54', hint: isNew ? 'Optioneel' : null, autocapitalize: 'characters' }),
-    field('Ticker bij koersbron', 'symbol', ins.symbol, { placeholder: 'bv. VUSA.AS', hint: 'Wordt in fase 2 gebruikt voor live koersen' }),
+    tickerField(ins.symbol),
     h('div', { class: 'field' },
       h('label', { for: 'f-kind' }, 'Soort'),
       h('select', { id: 'f-kind', name: 'kind' },
@@ -85,17 +166,18 @@ export async function positionView(root, id) {
     try {
       await deletePosition(id);
       toast('Positie verwijderd');
-      location.hash = '#/';
+      location.hash = '#/posities';
     } catch (err) { toast(`Verwijderen mislukt: ${err.message}`, 'error'); }
   }
 
   const sections = [
     h('div', { class: 'page-head' },
-      h('div', {}, h('a', { href: '#/', class: 'back' }, '← Posities'), h('h1', {}, isNew ? 'Nieuwe positie' : ins.name)),
+      h('div', {}, h('a', { href: '#/posities', class: 'back' }, '← Posities'), h('h1', {}, isNew ? 'Nieuwe positie' : ins.name)),
     ),
     form,
   ];
   if (!isNew) {
+    if (['etf', 'fund'].includes(ins.kind)) sections.push(etfProfileSection(id, data.profile, () => positionView(root, id)));
     sections.push(journalSection(id, data.journal, () => positionView(root, id)));
     if (data.transactions.length) sections.push(transactionsSection(data.transactions, ins.currency));
   }

@@ -60,7 +60,7 @@ export default {
         if (!/^[\w.\-^=]{1,20}$/.test(symbol)) return json({ error: 'Ongeldige ticker' }, 400, headers);
         const c = await fetchChart(ctx, symbol, new Date(Date.now() - 40 * 86400e3));
         if (!c) return json({ error: 'Ticker niet gevonden' }, 404, headers);
-        return json({ symbol: c.symbol, currency: c.currency, exchange: c.exchange, price: c.price, priceTime: c.priceTime, hasHistory: c.closes.length >= 5 }, 200, headers);
+        return json({ symbol: c.symbol, name: c.name, currency: c.currency, exchange: c.exchange, price: c.price, priceTime: c.priceTime, hasHistory: c.closes.length >= 5 }, 200, headers);
       }
       return json({ error: 'Niet gevonden' }, 404, headers);
     } catch (e) {

@@ -1,6 +1,7 @@
 import { parseCsv, detectDelimiter, detectDecimalSeparator, parseNumber, parseDate, amsterdamToIso } from '../js/csv.js';
 import { parseDegiroCsv } from '../js/degiro.js';
 import { derivePositions, planTransactionsImport, planPortfolioImport } from '../js/importer.js';
+import { portfolioSeries, benchmarkSeries, periodReturn, dayChange, allocation, overlap, companyExposure, warnings } from '../js/analytics.js';
 import * as F from './fixtures.js';
 
 const results = [];
@@ -122,6 +123,62 @@ test('portefeuille-import: verdwenen positie wordt verwijderd, gewijzigd aantal 
   const plan = planPortfolioImport(parseDegiroCsv(F.PORTFOLIO_SEMICOLON), existing);
   eq(plan.rows[0].status, 'changed'); eq(plan.payload.p_remove_isins, ['NL0000000001']);
   eq(plan.payload.p_positions[0].cost_basis_eur, 800);
+});
+
+// ---- analytics.js ----
+const tx = (id, ts, q, price, total) => ({ instrument_id: id, executed_at: ts, quantity: q, price, total_eur: total });
+const P = rows => rows.map(([date, close_eur]) => ({ date, close_eur }));
+
+test('waardeverloop: inleg en waarde per dag, koers doorgetrokken', () => {
+  const prices = new Map([['A', P([['2026-05-04', 100], ['2026-05-05', 110], ['2026-05-07', 120]])], ['B', P([['2026-05-05', 10], ['2026-05-06', 12]])]]);
+  const { points, excluded } = portfolioSeries([
+    tx('A', '2026-05-04T08:00:00Z', 10, 100, -1001),
+    tx('B', '2026-05-06T08:00:00Z', 5, 12, -61),
+    tx('C', '2026-05-06T08:00:00Z', 1, 5, -5),
+  ], prices);
+  eq(excluded, ['C']);
+  eq(points.map(p => [p.date, p.value, p.invested]), [
+    ['2026-05-04', 1000, 1001], ['2026-05-05', 1100, 1001], ['2026-05-06', 1160, 1062], ['2026-05-07', 1260, 1062]]);
+});
+test('transactie om 00:30 NL-tijd telt op de juiste (lokale) dag', () => {
+  const prices = new Map([['A', P([['2026-05-04', 100], ['2026-05-05', 100]])]]);
+  const { points } = portfolioSeries([tx('A', '2026-05-04T22:30:00Z', 1, 100, -100)], prices);
+  eq(points[0].date, '2026-05-05');
+});
+test('benchmark met dezelfde stortingen', () => {
+  const points = [{ date: '2026-05-04', flow: 1000 }, { date: '2026-05-05', flow: 0 }, { date: '2026-05-06', flow: 550 }];
+  const b = benchmarkSeries(points, P([['2026-05-04', 50], ['2026-05-05', 55], ['2026-05-06', 55]]));
+  eq(b.map(x => x.value), [1000, 1100, 1650]);
+});
+test('Modified Dietz corrigeert voor storting halverwege', () => {
+  const r = periodReturn([
+    { date: '2026-01-01', value: 1000, flow: 0 }, { date: '2026-01-11', value: 2100, flow: 1000 }, { date: '2026-01-21', value: 2200, flow: 0 }]);
+  eq(r.result, 200); close(r.pct, 200 / 1500);
+});
+test('dagverandering', () => close(dayChange(P([['a', 100], ['b', 102]])), 0.02));
+test('spreiding: profiel, rest = Overig, zonder profiel = Onbekend, cash', () => {
+  const a = allocation([
+    { name: 'ETF', kind: 'etf', value: 1000, profile: { sectors: { Tech: 60, Zorg: 30 } } },
+    { name: 'X', kind: 'etf', value: 500 },
+    { name: 'Cash', kind: 'cash', currency: 'EUR', value: 100 },
+  ], 'sectors');
+  eq(a.map(x => [x.label, x.value]), [['Tech', 600], ['Zorg', 300], ['Cash', 100], ['Overig', 100], ['Onbekend', 500]]);
+});
+test('overlap en bedrijfsblootstelling via meerdere ETF\'s', () => {
+  const sp = [{ name: 'NVIDIA Corp', ticker: 'NVDA', weight_pct: 7 }, { name: 'Apple Inc', ticker: 'AAPL', weight_pct: 6 }, { name: 'Berkshire', ticker: 'BRK.B', weight_pct: 2 }];
+  const nq = [{ name: 'NVIDIA', ticker: 'NVDA', weight_pct: 9 }, { name: 'Apple', ticker: 'AAPL', weight_pct: 8 }];
+  eq(overlap(sp, nq).pct, 13);
+  const exp = companyExposure([{ name: 'SP', kind: 'etf', value: 1000, profile: { holdings: sp } }, { name: 'NQ', kind: 'etf', value: 1000, profile: { holdings: nq } }]);
+  eq([exp[0].name, exp[0].value, exp[0].via.length], ['NVIDIA Corp', 160, 2]);
+});
+test('waarschuwingen: concentratie en overlap', () => {
+  const big = Array.from({ length: 10 }, (_, i) => ({ name: `H${i}`, ticker: `H${i}`, weight_pct: 5 }));
+  const w = warnings([
+    { name: 'SP', kind: 'etf', value: 3000, profile: { holdings: big } },
+    { name: 'NQ', kind: 'etf', value: 1000, profile: { holdings: big } },
+  ], { concentration_pct: 25 });
+  if (!w.some(x => x.text.startsWith('SP is 75%'))) throw new Error('concentratie ontbreekt: ' + JSON.stringify(w));
+  if (!w.some(x => x.text.startsWith('Overlap van 50%'))) throw new Error('overlap ontbreekt');
 });
 
 // ---- optioneel: echte exports uit web/tests/local/ (staat in .gitignore) ----

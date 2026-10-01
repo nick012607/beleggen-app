@@ -3,6 +3,8 @@ import { setUser, ensureSettings } from './db.js';
 import { h, mount } from './ui.js';
 import { loginView } from './views/login.js';
 import { positionsView } from './views/positions.js';
+import { dashboardView } from './views/dashboard.js';
+import { watchlistView } from './views/watchlist.js';
 import { positionView } from './views/position.js';
 import { importView } from './views/import.js';
 
@@ -10,7 +12,9 @@ const main = document.getElementById('main');
 const nav = document.getElementById('nav');
 
 const routes = [
-  [/^#\/?$/, root => positionsView(root)],
+  [/^#\/?$/, root => dashboardView(root)],
+  [/^#\/posities$/, root => positionsView(root)],
+  [/^#\/watchlist$/, root => watchlistView(root)],
   [/^#\/import$/, root => importView(root)],
   [/^#\/positie\/nieuw$/, root => positionView(root, null)],
   [/^#\/positie\/([0-9a-f-]{36})$/, (root, m) => positionView(root, m[1])],
@@ -48,7 +52,9 @@ async function render() {
 
 function renderNav() {
   mount(nav,
-    h('a', { href: '#/', dataset: { match: '#/positie' } }, 'Posities'),
+    h('a', { href: '#/' }, 'Dashboard'),
+    h('a', { href: '#/posities', dataset: { match: '#/positie' } }, 'Posities'),
+    h('a', { href: '#/watchlist' }, 'Watchlist'),
     h('a', { href: '#/import' }, 'Importeren'),
     h('span', { class: 'spacer' }),
     h('span', { class: 'user muted small' }, session.user.email),

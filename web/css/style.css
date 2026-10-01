@@ -177,3 +177,62 @@ ul.journal .body { margin: 0; white-space: pre-wrap; }
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 #toast.error { background: var(--neg); color: #fff; }
+
+/* ===== Fase 2: dashboard ===== */
+:root { --s-value: #1f4e79; --s-invested: #8a8f98; --s-bench: #c27c0e; }
+@media (prefers-color-scheme: dark) { :root { --s-value: #7fb0e0; --s-invested: #8a8f98; --s-bench: #e3a23b; } }
+
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.card-head h2 { margin: 0; }
+section > .card-head { margin-top: .5rem; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+.grid-2 > .card { margin-bottom: 0; }
+.grid-2 { margin-bottom: 1rem; }
+.grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+.inline { display: flex; gap: .5rem; }
+.inline input { flex: 1; min-width: 0; }
+
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: .35rem .7rem; font-weight: 500; background: transparent; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button.active { background: var(--accent); color: var(--accent-text); }
+
+.chart-legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: .85rem; color: var(--muted); margin-bottom: .25rem; }
+.key i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: .4rem; vertical-align: middle; background: currentColor; }
+.key.s-value i { background: var(--s-value); }
+.key.s-invested i { background: var(--s-invested); }
+.key.s-bench i { background: var(--s-bench); }
+.chart-area { position: relative; }
+.chart-svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
+.chart-svg .grid { stroke: var(--border); stroke-width: 1; }
+.chart-svg .axis { fill: var(--muted); font-size: 12px; font-family: var(--sans); }
+.chart-svg .line { fill: none; stroke-width: 2.25; stroke-linejoin: round; }
+.chart-svg .line.dashed { stroke-dasharray: 5 4; stroke-width: 1.5; }
+.chart-svg .s-value { stroke: var(--s-value); }
+.chart-svg .s-invested { stroke: var(--s-invested); }
+.chart-svg .s-bench { stroke: var(--s-bench); }
+.chart-svg .dot { fill: var(--surface); stroke-width: 2; }
+.chart-svg .cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-tip {
+  position: absolute; top: 0; transform: translateX(-50%); pointer-events: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow);
+  padding: .4rem .6rem; font-size: .8rem; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+
+ul.bars { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .55rem; }
+.bar-label { display: flex; justify-content: space-between; gap: .5rem; font-size: .9rem; }
+.bar { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; margin-top: .2rem; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.bar.unknown i { background: var(--s-invested); }
+
+ul.signals, ul.exposure { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .5rem; }
+ul.signals li { padding: .5rem .7rem; border-radius: 8px; background: var(--bg); border-left: 3px solid var(--accent); font-size: .9rem; }
+ul.signals li.warn { border-left-color: var(--warn-border); background: var(--warn-bg); border-top: 0; border-right: 0; border-bottom: 0; }
+ul.exposure li { display: flex; justify-content: space-between; gap: .5rem; font-size: .9rem; border-bottom: 1px solid var(--border); padding-bottom: .35rem; }
+
+/* Watchlist */
+.add-row { display: flex; gap: .5rem; }
+.add-row input { flex: 1; min-width: 0; }
+td.limits { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+input.limit { width: 6.5rem; padding: .35rem .5rem; }
+table.data tr.alert td { background: var(--warn-bg); }

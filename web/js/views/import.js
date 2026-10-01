@@ -27,7 +27,7 @@ export function importView(root) {
   const preview = h('div', { id: 'preview' });
 
   mount(root,
-    h('div', { class: 'page-head' }, h('div', {}, h('a', { href: '#/', class: 'back' }, '← Posities'), h('h1', {}, 'CSV importeren'))),
+    h('div', { class: 'page-head' }, h('div', {}, h('a', { href: '#/posities', class: 'back' }, '← Posities'), h('h1', {}, 'CSV importeren'))),
     h('div', { class: 'card stack' },
       drop,
       h('details', { class: 'help' },

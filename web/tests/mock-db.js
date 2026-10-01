@@ -1,5 +1,5 @@
 // In-memory vervanging van js/db.js. applyImport bootst de SQL-functie apply_import na.
-const S = (window.__mockDb = { instruments: [], positions: [], transactions: [], journal: [] });
+const S = (window.__mockDb = { instruments: [], positions: [], transactions: [], journal: [], prices: [], profiles: [], watchlist: [], settings: { concentration_pct: 25, benchmark_symbol: 'IWDA.AS' } });
 const uuid = () => crypto.randomUUID();
 const byIsin = isin => S.instruments.find(i => i.isin === isin);
 
@@ -75,3 +75,35 @@ export async function addJournal(instrument_id, body) {
 }
 export async function updateJournal(id, body) { Object.assign(S.journal.find(j => j.id === id), { body, updated_at: new Date().toISOString() }); }
 export async function deleteJournal(id) { S.journal = S.journal.filter(j => j.id !== id); }
+
+// ---- fase 2 ----
+export async function getSettings() { return S.settings; }
+export async function listInstruments() { return S.instruments; }
+export async function listTransactions() {
+  return [...S.transactions].sort((a, b) => a.executed_at.localeCompare(b.executed_at));
+}
+export async function listPrices() {
+  const m = new Map();
+  for (const p of [...S.prices].sort((a, b) => a.date.localeCompare(b.date))) {
+    if (!m.has(p.instrument_id)) m.set(p.instrument_id, []);
+    m.get(p.instrument_id).push(p);
+  }
+  return m;
+}
+export async function listEtfProfiles() { return S.profiles; }
+export async function getEtfProfile(id) { return S.profiles.find(p => p.instrument_id === id) ?? null; }
+export async function saveEtfProfile(instrument_id, fields) {
+  S.profiles = S.profiles.filter(p => p.instrument_id !== instrument_id);
+  S.profiles.push({ instrument_id, ...fields, updated_at: new Date().toISOString() });
+}
+export async function listWatchlist() {
+  return S.watchlist.map(w => ({ ...w, instrument: S.instruments.find(i => i.id === w.instrument_id) }));
+}
+export async function addToWatchlist({ isin, name, symbol, currency, kind }) {
+  let ins = byIsin(isin) ?? S.instruments.find(i => symbol && i.symbol === symbol);
+  if (!ins) { ins = { id: uuid(), isin, name, symbol, currency, kind }; S.instruments.push(ins); }
+  if (!S.watchlist.some(w => w.instrument_id === ins.id)) S.watchlist.push({ id: uuid(), instrument_id: ins.id, created_at: new Date().toISOString() });
+  return ins;
+}
+export async function updateWatch(id, fields) { Object.assign(S.watchlist.find(w => w.id === id), fields); }
+export async function deleteWatch(id) { S.watchlist = S.watchlist.filter(w => w.id !== id); }

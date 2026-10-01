@@ -35,6 +35,7 @@ export async function fetchChart(ctx, symbol, from, to = new Date()) {
   });
   return {
     symbol: meta.symbol,
+    name: meta.longName ?? meta.shortName ?? null,
     currency,
     exchange: meta.exchangeName,
     price: meta.regularMarketPrice != null ? round(meta.regularMarketPrice * factor, 6) : closes.at(-1)?.close ?? null,
