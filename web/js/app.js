@@ -1,6 +1,6 @@
 import { supabase, configured } from './supabase.js';
 import { setUser, ensureSettings } from './db.js';
-import { h, mount, toast } from './ui.js';
+import { h, mount } from './ui.js';
 import { loginView } from './views/login.js';
 import { positionsView } from './views/positions.js';
 import { positionView } from './views/position.js';
@@ -17,11 +17,20 @@ const routes = [
 ];
 
 let session = null;
+let authError = null;
+
+function explainAuthError(code, message) {
+  if (code === 'otp_expired' || /expired|invalid/i.test(message ?? '')) {
+    return 'Deze inloglink is verlopen of al gebruikt. Hotmail/Outlook opent links soms automatisch om ze te scannen. Vraag een nieuwe link aan, of gebruik de code uit de mail.';
+  }
+  return `Inloggen mislukt: ${message}`;
+}
 
 async function render() {
   if (!session) {
     nav.replaceChildren();
-    loginView(main);
+    loginView(main, authError);
+    authError = null;
     return;
   }
   const hash = location.hash || '#/';
@@ -55,15 +64,28 @@ async function init() {
     return;
   }
 
-  const { data } = await supabase.auth.getSession();
-  await setSession(data.session);
-
-  // Tokens uit de magic link (#access_token=...) uit de adresbalk halen
-  if (/access_token|error_description/.test(location.hash)) {
-    const err = new URLSearchParams(location.hash.slice(1)).get('error_description');
-    if (err) toast(`Inloggen mislukt: ${err}`, 'error');
+  // 1. Link uit onze eigen e-mailtemplate: ?token_hash=...&type=...
+  //    Pas hier (met JavaScript) wordt de link verbruikt, zodat linkscanners van
+  //    Hotmail/Outlook hem niet ongeldig maken door hem vooraf te openen.
+  const query = new URLSearchParams(location.search);
+  if (query.get('token_hash')) {
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: query.get('token_hash'),
+      type: query.get('type') || 'email',
+    });
+    if (error) authError = explainAuthError(error.code, error.message);
     history.replaceState(null, '', location.pathname + '#/');
   }
+
+  // 2. Standaardlink van Supabase: #access_token=... of #error=...
+  if (/access_token|error_description/.test(location.hash)) {
+    const hp = new URLSearchParams(location.hash.slice(1));
+    if (hp.get('error_description')) authError = explainAuthError(hp.get('error_code'), hp.get('error_description'));
+  }
+
+  const { data } = await supabase.auth.getSession();
+  await setSession(data.session);
+  if (/access_token|error/.test(location.hash)) history.replaceState(null, '', location.pathname + '#/');
 
   supabase.auth.onAuthStateChange((_event, s) => {
     // Alleen opnieuw tekenen bij in- of uitloggen, niet bij elke tokenverversing.
