@@ -218,13 +218,25 @@ end $$;
 
 -- ---------------------------------------------------------------------
 -- Row Level Security: aan op ALLE tabellen, alleen eigen rijen
+-- (uitgeschreven per tabel, zodat de controle van Supabase het ook herkent)
 -- ---------------------------------------------------------------------
+alter table public.settings           enable row level security;
+alter table public.instruments        enable row level security;
+alter table public.positions          enable row level security;
+alter table public.transactions       enable row level security;
+alter table public.journal_entries    enable row level security;
+alter table public.etf_profiles       enable row level security;
+alter table public.watchlist          enable row level security;
+alter table public.prices             enable row level security;
+alter table public.editions           enable row level security;
+alter table public.usage_log          enable row level security;
+alter table public.push_subscriptions enable row level security;
+
 do $$
 declare t text;
 begin
   foreach t in array array['settings','instruments','positions','transactions','journal_entries',
                            'etf_profiles','watchlist','prices','editions','usage_log','push_subscriptions'] loop
-    execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists own_rows on public.%I', t);
     execute format('create policy own_rows on public.%I for all to authenticated
                     using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
