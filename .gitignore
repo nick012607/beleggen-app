@@ -20,3 +20,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# Lokale testbestanden met echte exports
+web/tests/local/

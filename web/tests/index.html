@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tests</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 900px; padding: 0 1rem; }
+    li { list-style: none; padding: 2px 0; }
+    .ok { color: #1a7f37; } .fail { color: #c62828; font-weight: 600; }
+    #summary { font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>Tests: CSV-parser en import</h1>
+  <p id="summary">Bezig…</p>
+  <ul id="results"></ul>
+  <p><small>Echte DEGIRO-exports kun je lokaal testen door ze in <code>web/tests/local/</code> te zetten (wordt niet gecommit).</small></p>
+  <script type="module" src="./tests.js"></script>
+</body>
+</html>
