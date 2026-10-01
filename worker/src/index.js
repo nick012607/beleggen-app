@@ -38,7 +38,12 @@ export default {
     const url = new URL(req.url);
 
     try {
-      if (url.pathname === '/api/health') return json({ ok: true }, 200, headers);
+      if (url.pathname === '/api/health') {
+        // Alleen ja/nee: kan de Worker de database bereiken? Geeft geen gegevens prijs.
+        let database = false;
+        try { await createDb(env, makeCtx()).get('settings?select=user_id&limit=1'); database = true; } catch { /* nee */ }
+        return json({ ok: true, database }, 200, headers);
+      }
 
       const ctx = makeCtx();
       const db = createDb(env, ctx);
