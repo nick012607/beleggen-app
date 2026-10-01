@@ -26,7 +26,9 @@ export function loginView(root) {
     if (error) {
       toast(/signups not allowed|not found/i.test(error.message)
         ? 'Dit e-mailadres heeft geen toegang.'
-        : `Versturen mislukt: ${error.message}`, 'error');
+        : /rate limit/i.test(error.message)
+          ? 'Te veel mails verstuurd (Supabase staat er maar een paar per uur toe). Gebruik de laatst ontvangen link of probeer het over een uur opnieuw.'
+          : `Versturen mislukt: ${error.message}`, 'error');
       return;
     }
     showSent();
