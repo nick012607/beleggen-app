@@ -1,0 +1,22 @@
+# Geheimen: nooit committen
+.dev.vars
+.env
+.env.*
+!.env.example
+
+# Persoonlijke exports (DEGIRO-CSV's e.d.)
+samples/
+*.csv
+!web/tests/fixtures/*.csv
+
+# Cloudflare / Node
+node_modules/
+.wrangler/
+dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
