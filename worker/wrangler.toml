@@ -1,0 +1,21 @@
+name = "beleggen-worker"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://nick012607.github.io,http://localhost:8080"
+SUPABASE_URL = "https://sqdciwujimgctdlxtsvi.supabase.co"
+# Publiek (zelfde als in de frontend); alleen gebruikt om tokens van gebruikers te controleren
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_GaClOcaJ1abZH9-Z-SyJTw_mEdl20QZ"
+
+# Geheimen: NIET hier, maar via `npx wrangler secret put NAAM`
+#   SUPABASE_SERVICE_ROLE_KEY   (fase 2)
+#   ANTHROPIC_API_KEY           (fase 3)
+#   FINNHUB_API_KEY             (fase 3)
+
+[triggers]
+# UTC. 17:45 UTC = 19:45 NL-zomertijd / 18:45 wintertijd: na sluiting Xetra en Euronext.
+crons = ["45 17 * * 1-5"]
+
+[observability]
+enabled = true
