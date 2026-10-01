@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UI-test (nepdata)</title>
+  <!-- Vervangt database en Supabase door in-memory versies; de echte schermen draaien ongewijzigd. -->
+  <script type="importmap">
+  { "imports": {
+      "/js/db.js": "/tests/mock-db.js",
+      "/js/supabase.js": "/tests/mock-supabase.js"
+  } }
+  </script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">Beleggen <small class="muted">(UI-test, nepdata)</small></a>
+    <nav id="nav" aria-label="Hoofdmenu"></nav>
+  </header>
+  <main id="main" tabindex="-1"></main>
+</body>
+</html>
