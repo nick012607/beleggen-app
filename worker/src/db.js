@@ -4,6 +4,7 @@
 export function createDb(env, ctx) {
   const base = env.SUPABASE_URL.replace(/\/$/, '');
   const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error('Worker-secret SUPABASE_SERVICE_ROLE_KEY ontbreekt');
   // Nieuwe sleutels (sb_secret_...) zijn geen JWT: alleen als apikey meesturen.
   const authHeaders = key.startsWith('eyJ') ? { apikey: key, Authorization: `Bearer ${key}` } : { apikey: key };
 
