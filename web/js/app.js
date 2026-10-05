@@ -7,6 +7,7 @@ import { dashboardView } from './views/dashboard.js';
 import { watchlistView } from './views/watchlist.js';
 import { positionView } from './views/position.js';
 import { importView } from './views/import.js';
+import { accountView } from './views/account.js';
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
@@ -16,6 +17,7 @@ const routes = [
   [/^#\/posities$/, root => positionsView(root)],
   [/^#\/watchlist$/, root => watchlistView(root)],
   [/^#\/import$/, root => importView(root)],
+  [/^#\/account$/, root => accountView(root)],
   [/^#\/positie\/nieuw$/, root => positionView(root, null)],
   [/^#\/positie\/([0-9a-f-]{36})$/, (root, m) => positionView(root, m[1])],
 ];
@@ -57,7 +59,7 @@ function renderNav() {
     h('a', { href: '#/watchlist' }, 'Watchlist'),
     h('a', { href: '#/import' }, 'Importeren'),
     h('span', { class: 'spacer' }),
-    h('span', { class: 'user muted small' }, session.user.email),
+    h('a', { href: '#/account', title: session.user.email }, 'Account'),
     h('button', { class: 'link', onclick: async () => { await supabase.auth.signOut(); } }, 'Uitloggen'),
   );
 }

@@ -6,5 +6,7 @@ export const supabase = {
     getSession: async () => ({ data: { session } }),
     onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
     signOut: async () => {},
+    getUser: async () => ({ data: { user: session.user } }),
+    updateUser: async ({ password }) => (window.__pwSet = password, { error: null }),
   },
 };
