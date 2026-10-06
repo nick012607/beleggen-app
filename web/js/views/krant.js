@@ -27,18 +27,23 @@ export async function krantView(root, id = null) {
   mount(root, h('p', { class: 'muted' }, 'Laden…'));
   const [edition, archive] = await Promise.all([id ? getEdition(id) : latestEdition(), listEditions()]);
 
-  const makeBtn = h('button', { class: 'primary', disabled: !workerConfigured, onclick: onMake }, 'Maak nu een editie');
-  async function onMake() {
-    if (!confirm('Nu een editie laten schrijven? Dat duurt 1 à 3 minuten en kost ongeveer $0,15–0,30 aan Claude-gebruik.')) return;
-    makeBtn.disabled = true; makeBtn.textContent = 'Claude schrijft… (1–3 min)';
+  const makeBtn = h('button', { class: 'primary', disabled: !workerConfigured, onclick: () => onMake('daily') }, 'Maak nu een editie');
+  const weekBtn = h('button', { disabled: !workerConfigured, onclick: () => onMake('weekly') }, 'Weekeditie');
+  async function onMake(kind) {
+    const what = kind === 'weekly' ? 'een weekeditie (terugblik op de afgelopen week)' : 'een editie';
+    const cost = kind === 'weekly' ? '$0,25–0,45' : '$0,15–0,30';
+    if (!confirm(`Nu ${what} laten schrijven? Dat duurt 1 à 3 minuten en kost ongeveer ${cost} aan Claude-gebruik.`)) return;
+    const btn = kind === 'weekly' ? weekBtn : makeBtn;
+    const label = btn.textContent;
+    makeBtn.disabled = weekBtn.disabled = true; btn.textContent = 'Claude schrijft… (1–3 min)';
     try {
-      const r = await generateEdition('daily');
+      const r = await generateEdition(kind);
       toast(`Editie klaar (kosten $${r.cost_usd.toFixed(3).replace('.', ',')}${r.attempt > 1 ? ', na een tweede poging' : ''})`);
       location.hash = `#/krant/${r.edition_id}`;
       if (location.hash === `#/krant/${r.edition_id}`) krantView(root, r.edition_id);
     } catch (e) {
       toast(`Mislukt: ${e.message}`, 'error');
-      makeBtn.disabled = false; makeBtn.textContent = 'Maak nu een editie';
+      makeBtn.disabled = weekBtn.disabled = false; btn.textContent = label;
     }
   }
 
@@ -51,13 +56,13 @@ export async function krantView(root, id = null) {
             : h('span', { class: 'muted', title: a.error ?? '' }, shortDate(a.edition_date), a.status === 'failed' ? ' · mislukt' : ' · bezig'))))
       : h('p', { class: 'muted' }, 'Nog geen edities.'));
 
-  const head = h('div', { class: 'page-head' }, h('h1', {}, 'Krant'), h('div', { class: 'actions' }, makeBtn));
+  const head = h('div', { class: 'page-head' }, h('h1', {}, 'Krant'), h('div', { class: 'actions' }, weekBtn, makeBtn));
 
   if (!edition || edition.status !== 'ready' || !edition.content) {
     mount(root, head,
       h('div', { class: 'card empty' },
         h('p', {}, edition?.status === 'failed' ? `De editie van ${longDate(edition.edition_date)} is mislukt: ${edition.error}` : 'Er is nog geen krant.'),
-        h('p', { class: 'muted' }, 'Elke werkdag rond 07:00 verschijnt er automatisch een nieuwe editie, op zondag een weekeditie. Je kunt er ook nu een laten maken.')),
+        h('p', { class: 'muted' }, 'Een editie verschijnt wanneer je erom vraagt: klik op “Maak nu een editie”, of op “Weekeditie” voor een terugblik op de week.')),
       archiveCard);
     return;
   }
