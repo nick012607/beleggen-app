@@ -83,6 +83,29 @@ export function periodReturn(series) {
   return { result: round(result), pct: base > 0 ? result / base : null };
 }
 
+/**
+ * Procentuele koersontwikkeling per instrument op een gezamenlijke datumas.
+ * items: [{id, start}] – start = eerste aankoopdatum; een lijn begint op max(start, from) op 0%.
+ * Geeft { dates, series: [{id, values: [pct|null]}] }; null = nog niet in bezit / geen koers.
+ */
+export function relativeSeries(prices, items, from) {
+  const dates = [...new Set(items.flatMap(it => (prices.get(it.id) ?? []).map(p => p.date)))]
+    .filter(d => d >= from).sort();
+  const series = items.map(it => {
+    const rows = prices.get(it.id) ?? [];
+    const start = it.start && it.start > from ? it.start : from;
+    let i = 0, last = null, base = null;
+    const values = dates.map(d => {
+      while (i < rows.length && rows[i].date <= d) { last = +rows[i].close_eur; i++; }
+      if (d < start || last == null) return null;
+      if (base == null) base = last;
+      return round((last / base - 1) * 100);
+    });
+    return { id: it.id, values };
+  });
+  return { dates, series };
+}
+
 /** Koersverandering laatste handelsdag: [{date, close_eur}] -> fractie of null. */
 export function dayChange(rows) {
   if (!rows || rows.length < 2) return null;

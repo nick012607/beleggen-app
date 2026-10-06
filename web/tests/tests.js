@@ -1,7 +1,7 @@
 import { parseCsv, detectDelimiter, detectDecimalSeparator, parseNumber, parseDate, amsterdamToIso } from '../js/csv.js';
 import { parseDegiroCsv } from '../js/degiro.js';
 import { derivePositions, planTransactionsImport, planPortfolioImport } from '../js/importer.js';
-import { portfolioSeries, benchmarkSeries, periodReturn, dayChange, allocation, overlap, companyExposure, warnings } from '../js/analytics.js';
+import { portfolioSeries, benchmarkSeries, periodReturn, dayChange, relativeSeries, allocation, overlap, companyExposure, warnings } from '../js/analytics.js';
 import * as F from './fixtures.js';
 
 const results = [];
@@ -155,7 +155,19 @@ test('Modified Dietz corrigeert voor storting halverwege', () => {
     { date: '2026-01-01', value: 1000, flow: 0 }, { date: '2026-01-11', value: 2100, flow: 1000 }, { date: '2026-01-21', value: 2200, flow: 0 }]);
   eq(r.result, 200); close(r.pct, 200 / 1500);
 });
-test('dagverandering', () => close(dayChange(P([['a', 100], ['b', 102]])), 0.02));
+test('procentuele lijnen: start op 0% vanaf aankoop of periodebegin', () => {
+  const prices = new Map([
+    ['A', P([['2026-05-01', 100], ['2026-05-04', 110], ['2026-05-05', 121]])],
+    ['B', P([['2026-05-01', 50], ['2026-05-04', 50], ['2026-05-05', 40]])],
+  ]);
+  const r = relativeSeries(prices, [{ id: 'A', start: '2026-05-01' }, { id: 'B', start: '2026-05-04' }], '2026-05-01');
+  eq(r.dates, ['2026-05-01', '2026-05-04', '2026-05-05']);
+  eq(r.series[0].values, [0, 10, 21]);
+  eq(r.series[1].values, [null, 0, -20]);
+  const later = relativeSeries(prices, [{ id: 'A', start: '2026-05-01' }], '2026-05-04');
+  eq(later.series[0].values, [0, 10]);
+});
+test('dagverandering',() => close(dayChange(P([['a', 100], ['b', 102]])), 0.02));
 test('spreiding: profiel, rest = Overig, zonder profiel = Onbekend, cash', () => {
   const a = allocation([
     { name: 'ETF', kind: 'etf', value: 1000, profile: { sectors: { Tech: 60, Zorg: 30 } } },

@@ -286,3 +286,42 @@ ul.agenda .date { color: var(--muted); }
 .stat-inline .big { font-family: var(--serif); font-size: 1.8rem; font-weight: 700; }
 .bar.over i { background: var(--neg); }
 .grid-form h2.full { grid-column: 1 / -1; margin: 0; }
+
+/* ===== Kleuren per positie (gevalideerd op kleurenblindheid, licht en donker apart) ===== */
+:root {
+  --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100;
+  --c5: #e87ba4; --c6: #008300; --c7: #4a3aa7; --c8: #e34948;
+  --c-cash: #b5b3ab; --c-other: #898781;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
+    --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767;
+    --c-cash: #5e5d58; --c-other: #898781;
+  }
+}
+
+/* Lijngrafiek: klikbare legenda en 0%-lijn */
+.chart-legend .key i { width: 14px; height: 3px; }
+.chart-legend button.key.toggle {
+  border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text);
+  padding: .2rem .6rem; font-weight: 500; font-size: .82rem; display: inline-flex; align-items: center;
+}
+.chart-legend button.key.toggle.off { color: var(--muted); opacity: .55; }
+.chart-legend button.key.toggle.off i { background: var(--border) !important; }
+.chart-svg .grid.zero { stroke: var(--muted); stroke-width: 1.25; }
+.chart-tip .key { display: flex; align-items: center; gap: .1rem; }
+
+/* Donut */
+.donut { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+.donut-svg { width: min(220px, 100%); height: auto; flex: 0 0 auto; margin: 0 auto; }
+.donut-seg { stroke: var(--surface); stroke-width: 0; transition: opacity .15s; outline: none; cursor: default; }
+.donut:has(.donut-seg.active) .donut-seg:not(.active) { opacity: .35; }
+.donut-value { font-family: var(--serif); font-size: 22px; font-weight: 700; fill: var(--text); }
+.donut-label { font-family: var(--sans); font-size: 11px; fill: var(--muted); }
+ul.donut-legend { list-style: none; padding: 0; margin: 0; flex: 1 1 220px; display: flex; flex-direction: column; gap: .2rem; font-size: .88rem; }
+ul.donut-legend li { display: grid; grid-template-columns: 12px 1fr auto auto; gap: .5rem; align-items: center; padding: .25rem .35rem; border-radius: 6px; }
+ul.donut-legend li.active { background: var(--bg); }
+ul.donut-legend i { width: 12px; height: 12px; border-radius: 3px; display: block; }
+ul.donut-legend .pct { font-weight: 600; font-variant-numeric: tabular-nums; }
+ul.donut-legend .amt { font-variant-numeric: tabular-nums; min-width: 4.5rem; text-align: right; }

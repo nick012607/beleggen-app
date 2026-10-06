@@ -1,11 +1,18 @@
 import { listPositions, listPrices, listTransactions, listEtfProfiles, getSettings, listInstruments } from '../db.js';
 import { refreshPrices, workerConfigured } from '../api.js';
-import { portfolioSeries, benchmarkSeries, periodReturn, dayChange, allocation, companyExposure, warnings } from '../analytics.js';
-import { lineChart, barList, pct1 } from '../chart.js';
+import { portfolioSeries, benchmarkSeries, periodReturn, dayChange, allocation, companyExposure, warnings, relativeSeries, localDay } from '../analytics.js';
+import { lineChart, barList, donutChart, pct1 } from '../chart.js';
 import { h, mount, toast, fmtEur, fmtPct, fmtSignedEur, fmtDateTime, signClass } from '../ui.js';
 
 const RANGES = [['1M', 31], ['3M', 92], ['YTD', 'ytd'], ['1J', 366], ['Alles', null]];
-let state = { range: 'Alles', dim: 'sectors' };
+let state = { range: 'Alles', perfRange: 'Alles', dim: 'sectors', hiddenLines: new Set() };
+
+/** Lange fondsnamen inkorten voor legenda's: "VANECK URANIUM AND NUCLEAR TECHN..." -> "VanEck Uranium and Nuclear Techn…" */
+function shortName(name) {
+  let s = name.replace(/\.{3}$/, '').replace(/\b(UCITS|ETF|ACC|USD|EUR|DIST|PLC|- ?1C|1C)\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+  if (s === s.toUpperCase()) s = s.toLowerCase().replace(/\b\p{L}/gu, c => c.toUpperCase()).replace(/\bS&p\b/, 'S&P').replace(/\bEqqq\b/, 'EQQQ').replace(/\bVaneck\b/, 'VanEck').replace(/\bAnd\b/g, 'and');
+  return s.length > 34 ? `${s.slice(0, 33)}…` : s;
+}
 
 export async function dashboardView(root) {
   mount(root, h('p', { class: 'muted' }, 'Laden…'));
@@ -114,6 +121,68 @@ export async function dashboardView(root) {
   };
   renderAlloc();
 
+  // ---- vaste kleur per positie: alfabetisch op naam (kleur volgt de positie, niet de grootte)
+  const held = items.filter(i => i.kind !== 'cash');
+  const colorOf = new Map([...held].sort((a, b) => a.name.localeCompare(b.name))
+    .map((it, k) => [it.id, k < 8 ? `var(--c${k + 1})` : 'var(--c-other)']));
+
+  // ---- koersverloop per positie (procentueel)
+  const firstBuy = new Map();
+  for (const t of txs) {
+    const d = localDay(t.executed_at);
+    if (!firstBuy.has(t.instrument_id) || d < firstBuy.get(t.instrument_id)) firstBuy.set(t.instrument_id, d);
+  }
+  const perfCard = h('section', { class: 'card' });
+  const renderPerf = () => {
+    const withPrices = held.filter(i => prices.get(i.id)?.length).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    const lastDate = withPrices.map(i => prices.get(i.id).at(-1).date).sort().at(-1);
+    let from;
+    if (state.perfRange === 'Alles' || !lastDate) {
+      from = [...firstBuy.values()].sort()[0] ?? withPrices.map(i => prices.get(i.id)[0].date).sort()[0] ?? '0000';
+    } else {
+      const def = RANGES.find(r => r[0] === state.perfRange)[1];
+      const last = new Date(lastDate);
+      from = def === 'ytd' ? `${last.getFullYear()}-01-01` : new Date(last - def * 86400e3).toISOString().slice(0, 10);
+    }
+    const { dates, series } = relativeSeries(prices, withPrices.map(i => ({ id: i.id, start: firstBuy.get(i.id) })), from);
+    const lines = series.map(s => {
+      const it = withPrices.find(i => i.id === s.id);
+      return {
+        label: shortName(it.name), color: colorOf.get(it.id), hidden: state.hiddenLines.has(it.id),
+        points: dates.map((date, k) => ({ date, value: s.values[k] })),
+      };
+    });
+    mount(perfCard,
+      h('div', { class: 'card-head' },
+        h('h2', {}, 'Koers per positie'),
+        h('div', { class: 'seg', role: 'group', 'aria-label': 'Periode' }, RANGES.map(([label]) =>
+          h('button', { class: state.perfRange === label ? 'active' : '', 'aria-pressed': String(state.perfRange === label), onclick: () => { state.perfRange = label; renderPerf(); } }, label)))),
+      lines.length
+        ? lineChart(lines, {
+            height: 300, zeroLine: true,
+            format: v => `${v > 0 ? '+' : ''}${(+v).toLocaleString('nl-NL', { maximumFractionDigits: 1 })}%`,
+            onToggle: k => {
+              const id = withPrices[k].id;
+              state.hiddenLines.has(id) ? state.hiddenLines.delete(id) : state.hiddenLines.add(id);
+              renderPerf();
+            },
+          })
+        : h('p', { class: 'muted' }, 'Nog geen koershistorie. Klik op “Koersen verversen”.'),
+      h('p', { class: 'muted small' }, state.perfRange === 'Alles'
+        ? 'Procentuele koersverandering sinds je eerste aankoop per positie (0% = koers op die dag). Klik op een naam om een lijn aan of uit te zetten.'
+        : 'Procentuele koersverandering sinds het begin van de gekozen periode. Klik op een naam om een lijn aan of uit te zetten.'),
+    );
+  };
+  renderPerf();
+
+  // ---- verdeling (donut)
+  const slices = [...items].filter(i => i.value > 0)
+    .sort((a, b) => (a.kind === 'cash') - (b.kind === 'cash') || b.value - a.value)
+    .map(i => ({ label: i.kind === 'cash' ? 'Cash' : shortName(i.name), value: i.value, color: i.kind === 'cash' ? 'var(--c-cash)' : colorOf.get(i.id) }));
+  const donutCard = h('section', { class: 'card' },
+    h('h2', {}, 'Verdeling'),
+    slices.length ? donutChart(slices, { format: v => fmtEur(v).replace(/,\d\d$/, ''), centerLabel: 'totaal' }) : h('p', { class: 'muted' }, 'Geen waarden bekend.'));
+
   const warns = warnings(items, settings);
   const exposure = companyExposure(items).filter(c => c.via.length > 1 || c.pct > 0.03).slice(0, 8);
 
@@ -130,8 +199,9 @@ export async function dashboardView(root) {
       stat('Vandaag', fmtSignedEur(today), signClass(today), fmtPct(total - today ? today / (total - today) : null)),
     ),
     chartCard,
-    h('div', { class: 'grid-2' },
-      allocCard,
+    perfCard,
+    h('div', { class: 'grid-2' }, donutCard, allocCard),
+    h('div', {},
       h('section', { class: 'card' },
         h('h2', {}, 'Signalen'),
         warns.length
