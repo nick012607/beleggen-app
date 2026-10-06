@@ -1,5 +1,5 @@
 // In-memory vervanging van js/db.js. applyImport bootst de SQL-functie apply_import na.
-const S = (window.__mockDb = { instruments: [], positions: [], transactions: [], journal: [], prices: [], profiles: [], watchlist: [], settings: { concentration_pct: 25, benchmark_symbol: 'IWDA.AS' } });
+const S = (window.__mockDb = { instruments: [], positions: [], transactions: [], journal: [], prices: [], profiles: [], watchlist: [], editions: [], usage: [], settings: { move_threshold_pct: 2, large_position_pct: 15, monthly_budget_usd: 8,  concentration_pct: 25, benchmark_symbol: 'IWDA.AS' } });
 const uuid = () => crypto.randomUUID();
 const byIsin = isin => S.instruments.find(i => i.isin === isin);
 
@@ -107,3 +107,10 @@ export async function addToWatchlist({ isin, name, symbol, currency, kind }) {
 }
 export async function updateWatch(id, fields) { Object.assign(S.watchlist.find(w => w.id === id), fields); }
 export async function deleteWatch(id) { S.watchlist = S.watchlist.filter(w => w.id !== id); }
+
+// ---- fase 3 ----
+export async function listEditions() { return [...S.editions].sort((a, b) => b.edition_date.localeCompare(a.edition_date)); }
+export async function getEdition(id) { return S.editions.find(e => e.id === id) ?? null; }
+export async function latestEdition() { return (await listEditions()).find(e => e.status === 'ready') ?? null; }
+export async function listUsage() { return S.usage; }
+export async function updateSettings(fields) { Object.assign(S.settings, fields); }

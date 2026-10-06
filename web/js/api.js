@@ -19,3 +19,7 @@ async function call(path, options = {}) {
 export const refreshPrices = () => call('/api/prices/refresh', { method: 'POST' });
 export const resolveIsin = (isin, refPrice) => call(`/api/resolve?isin=${encodeURIComponent(isin)}${refPrice ? `&ref=${refPrice}` : ''}`);
 export const quote = symbol => call(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
+
+const post = (path, body) => call(path, { method: 'POST', body: JSON.stringify(body) });
+export const generateEdition = (kind = 'daily') => post('/api/edition/generate', { kind });
+export const suggestEtfProfile = instrumentId => post('/api/etf-profile/suggest', { instrument_id: instrumentId });

@@ -7,17 +7,20 @@ import { dashboardView } from './views/dashboard.js';
 import { watchlistView } from './views/watchlist.js';
 import { positionView } from './views/position.js';
 import { importView } from './views/import.js';
-import { accountView } from './views/account.js';
+import { settingsView } from './views/settings.js';
+import { krantView } from './views/krant.js';
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
 
 const routes = [
   [/^#\/?$/, root => dashboardView(root)],
+  [/^#\/krant$/, root => krantView(root)],
+  [/^#\/krant\/([0-9a-f-]{36})$/, (root, m) => krantView(root, m[1])],
   [/^#\/posities$/, root => positionsView(root)],
   [/^#\/watchlist$/, root => watchlistView(root)],
   [/^#\/import$/, root => importView(root)],
-  [/^#\/account$/, root => accountView(root)],
+  [/^#\/(instellingen|account)$/, root => settingsView(root)],
   [/^#\/positie\/nieuw$/, root => positionView(root, null)],
   [/^#\/positie\/([0-9a-f-]{36})$/, (root, m) => positionView(root, m[1])],
 ];
@@ -40,7 +43,7 @@ async function render() {
     return;
   }
   const hash = location.hash || '#/';
-  for (const link of nav.querySelectorAll('a')) link.classList.toggle('active', hash === link.getAttribute('href') || (link.dataset.match && hash.startsWith(link.dataset.match)));
+  for (const link of nav.querySelectorAll('a')) link.classList.toggle('active', hash === link.getAttribute('href') || Boolean(link.dataset.match && hash.startsWith(link.dataset.match)));
   const route = routes.find(([re]) => re.test(hash));
   if (!route) { location.hash = '#/'; return; }
   try {
@@ -54,13 +57,13 @@ async function render() {
 
 function renderNav() {
   mount(nav,
+    h('a', { href: '#/krant', dataset: { match: '#/krant' } }, 'Krant'),
     h('a', { href: '#/' }, 'Dashboard'),
     h('a', { href: '#/posities', dataset: { match: '#/positie' } }, 'Posities'),
     h('a', { href: '#/watchlist' }, 'Watchlist'),
     h('a', { href: '#/import' }, 'Importeren'),
     h('span', { class: 'spacer' }),
-    h('a', { href: '#/account', title: session.user.email }, 'Account'),
-    h('button', { class: 'link', onclick: async () => { await supabase.auth.signOut(); } }, 'Uitloggen'),
+    h('a', { href: '#/instellingen', title: session.user.email, dataset: { match: '#/account' } }, 'Instellingen'),
   );
 }
 

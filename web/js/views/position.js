@@ -1,5 +1,5 @@
 import { getInstrument, getEtfProfile, saveEtfProfile, savePosition, deletePosition, addJournal, updateJournal, deleteJournal } from '../db.js';
-import { quote, workerConfigured } from '../api.js';
+import { quote, suggestEtfProfile, workerConfigured } from '../api.js';
 import { h, mount, toast, inputNumber, fmtNum, fmtMoney, fmtEur, fmtDate, fmtDateTime, KIND_LABELS } from '../ui.js';
 
 const ISIN_RE = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
@@ -48,6 +48,9 @@ function parseHoldings(text) {
 
 function etfProfileSection(instrumentId, profile, reload) {
   const ta = (name, value, rows, placeholder) => h('textarea', { name, rows, placeholder }, value);
+  let fromClaude = false;
+  const suggestBtn = h('button', { type: 'button', disabled: !workerConfigured, onclick: () => suggest() }, 'Laat Claude voorstellen');
+  const suggestInfo = h('p', { class: 'warn small', hidden: true });
   const form = h('form', { class: 'stack', onsubmit: async e => {
     e.preventDefault();
     const f = form.elements;
@@ -58,7 +61,7 @@ function etfProfileSection(instrumentId, profile, reload) {
         sectors: parsePctLines(f.sectors.value, 'Sectoren'),
         regions: parsePctLines(f.regions.value, 'Regio’s'),
         currencies: parsePctLines(f.currencies.value, 'Valuta'),
-        source: 'manual',
+        source: fromClaude || profile?.source === 'claude' ? 'claude' : 'manual',
       });
       toast('ETF-profiel opgeslagen');
       reload();
@@ -72,14 +75,42 @@ function etfProfileSection(instrumentId, profile, reload) {
       h('div', { class: 'field' }, h('label', {}, 'Sectoren (%)'), ta('sectors', pctLines(profile?.sectors), 6, 'Technologie: 32\nFinancieel: 13')),
       h('div', { class: 'field' }, h('label', {}, 'Regio’s (%)'), ta('regions', pctLines(profile?.regions), 6, 'Noord-Amerika: 100')),
       h('div', { class: 'field' }, h('label', {}, 'Valuta onderliggend (%)'), ta('currencies', pctLines(profile?.currencies), 6, 'USD: 100'))),
-    h('div', { class: 'form-actions' }, h('button', { type: 'submit', class: 'primary' }, 'Profiel opslaan')),
+    h('div', { class: 'form-actions' },
+      h('button', { type: 'submit', class: 'primary' }, 'Profiel opslaan'),
+      suggestBtn),
+    suggestInfo,
   );
   return h('section', { class: 'card' },
     h('h2', {}, 'ETF-profiel'),
     h('p', { class: 'muted small' },
       profile ? `Bron: ${profile.source === 'claude' ? 'voorgesteld door Claude, daarna te bewerken' : 'handmatig'} · bijgewerkt ${fmtDate(profile.updated_at)}. ` : '',
-      'Gebruikt voor spreiding, overlap en de krant. Claude kan dit straks één keer voorstellen.'),
+      'Gebruikt voor spreiding, overlap en de krant.'),
     form);
+
+  // Claude doet een voorstel (web search); jij controleert en slaat op.
+  async function suggest() {
+    if (profile && !confirm('Er is al een profiel. Laat Claude een nieuw voorstel doen? Je huidige invoer wordt pas vervangen als je opslaat.')) return;
+    suggestBtn.disabled = true; suggestBtn.textContent = 'Claude zoekt… (± 1 min)';
+    try {
+      const { profile: p, cost_usd } = await suggestEtfProfile(instrumentId);
+      const f = form.elements;
+      f.theme.value = p.theme ?? '';
+      f.holdings.value = holdingLines(p.holdings);
+      f.sectors.value = pctLines(p.sectors);
+      f.regions.value = pctLines(p.regions);
+      f.currencies.value = pctLines(p.currencies);
+      fromClaude = true;
+      let src = null;
+      try { const u = new URL(p.source_url); if (['http:', 'https:'].includes(u.protocol)) src = u.href; } catch { /* geen geldige bron */ }
+      suggestInfo.replaceChildren(`Voorstel van Claude (kosten $${cost_usd.toFixed(3).replace('.', ',')}). Controleer het en klik op “Profiel opslaan”. `,
+        src ? h('a', { href: src, target: '_blank', rel: 'noopener noreferrer' }, 'Bron') : '');
+      suggestInfo.hidden = false;
+    } catch (err) {
+      toast(`Voorstel mislukt: ${err.message}`, 'error');
+    } finally {
+      suggestBtn.disabled = !workerConfigured; suggestBtn.textContent = 'Laat Claude voorstellen';
+    }
+  }
 }
 
 /** Detail- en bewerkpagina. id = null voor een nieuwe positie. */

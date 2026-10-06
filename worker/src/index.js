@@ -1,7 +1,13 @@
-// Cloudflare Worker: koersen (fase 2), later ook de dagelijkse krant (fase 3).
+// Cloudflare Worker: koersen (fase 2) en de dagelijkse krant (fase 3).
 import { createDb } from './db.js';
 import { refreshUser } from './prices.js';
 import { resolveIsin, fetchChart } from './yahoo.js';
+import { generateEdition } from './edition.js';
+import { suggestProfile } from './profile.js';
+
+const amsParts = d => Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/Amsterdam', hour: 'numeric', hourCycle: 'h23', weekday: 'short',
+}).formatToParts(d).map(p => [p.type, p.value]));
 
 // Workers Free staat 50 externe aanroepen per uitvoering toe; we houden marge.
 function makeCtx(limit = 45) {
@@ -54,6 +60,16 @@ export default {
       if (url.pathname === '/api/prices/refresh' && req.method === 'POST') {
         return json(await refreshUser(ctx, db, user.id, { resolveLimit: 8 }), 200, headers);
       }
+      if (url.pathname === '/api/edition/generate' && req.method === 'POST') {
+        const body = await req.json().catch(() => ({}));
+        const kind = body.kind === 'weekly' ? 'weekly' : 'daily';
+        return json(await generateEdition(env, ctx, db, user.id, { kind, trigger: 'manual' }), 200, headers);
+      }
+      if (url.pathname === '/api/etf-profile/suggest' && req.method === 'POST') {
+        const body = await req.json().catch(() => ({}));
+        if (!/^[0-9a-f-]{36}$/.test(body.instrument_id ?? '')) return json({ error: 'Ongeldig instrument' }, 400, headers);
+        return json(await suggestProfile(env, ctx, db, user.id, body.instrument_id), 200, headers);
+      }
       if (url.pathname === '/api/resolve' && req.method === 'GET') {
         const isin = (url.searchParams.get('isin') || '').toUpperCase();
         if (!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)) return json({ error: 'Ongeldige ISIN' }, 400, headers);
@@ -74,18 +90,29 @@ export default {
     }
   },
 
-  // Cron: koersen na sluiting van de Europese beurzen bijwerken
+  // Cron. Cloudflare rekent in UTC; de krant moet om 07:00 NL-tijd komen, dus er staan twee
+  // ochtendtijden (zomer- en wintertijd) en we controleren hier welke van de twee 07:00 is.
   async scheduled(event, env, execCtx) {
     execCtx.waitUntil((async () => {
       const ctx = makeCtx();
       const db = createDb(env, ctx);
       const users = await db.get('settings?select=user_id');
+      const now = amsParts(new Date(event.scheduledTime));
+      const isMorning = event.cron.startsWith('0 5') || event.cron.startsWith('0 6');
+
       for (const { user_id } of users) {
         try {
-          const s = await refreshUser(ctx, db, user_id, { resolveLimit: 8 });
-          console.log('koersen', user_id, JSON.stringify(s));
+          if (!isMorning) {
+            const s = await refreshUser(ctx, db, user_id, { resolveLimit: 8 });
+            console.log('koersen', user_id, JSON.stringify(s));
+          } else if (+now.hour === 7) {
+            const kind = now.weekday === 'Sun' ? 'weekly' : 'daily';
+            if (kind === 'daily' && now.weekday === 'Sat') continue; // geen zaterdageditie
+            const r = await generateEdition(env, ctx, db, user_id, { kind, trigger: 'cron' });
+            console.log('krant', user_id, JSON.stringify(r));
+          }
         } catch (e) {
-          console.error('koersen mislukt', user_id, e.message);
+          console.error('cron mislukt', user_id, e.message);
         }
       }
     })());

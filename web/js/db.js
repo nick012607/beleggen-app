@@ -82,6 +82,30 @@ export async function deleteWatch(id) {
   check(await supabase.from('watchlist').delete().eq('id', id));
 }
 
+// ---- krant en kosten (fase 3) ----
+export async function listEditions() {
+  return check(await supabase.from('editions').select('id,edition_date,kind,status,error,created_at')
+    .order('edition_date', { ascending: false }).order('kind').limit(120));
+}
+
+export async function getEdition(id) {
+  return check(await supabase.from('editions').select('*').eq('id', id).maybeSingle());
+}
+
+export async function latestEdition() {
+  return check(await supabase.from('editions').select('*').eq('status', 'ready')
+    .order('edition_date', { ascending: false }).order('created_at', { ascending: false }).limit(1)).at(0) ?? null;
+}
+
+/** Kostenlog vanaf een datum (ISO). */
+export async function listUsage(fromIso) {
+  return check(await supabase.from('usage_log').select('*').gte('run_at', fromIso).order('run_at', { ascending: false }));
+}
+
+export async function updateSettings(fields) {
+  check(await supabase.from('settings').update(fields).eq('user_id', userId));
+}
+
 export async function ensureSettings() {
   check(await supabase.from('settings').upsert({ user_id: userId }, { onConflict: 'user_id', ignoreDuplicates: true }));
 }
