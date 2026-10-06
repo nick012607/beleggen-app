@@ -206,8 +206,9 @@ section > .card-head { margin-top: .5rem; }
 .chart-svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
 .chart-svg .grid { stroke: var(--border); stroke-width: 1; }
 .chart-svg .axis { fill: var(--muted); font-size: 12px; font-family: var(--sans); }
-.chart-svg .line { fill: none; stroke-width: 2.25; stroke-linejoin: round; }
-.chart-svg .line.dashed { stroke-dasharray: 5 4; stroke-width: 1.5; }
+.chart-svg .line { fill: none; stroke-width: 1.75px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.chart-svg path.line[style] { stroke-width: 1.4px; } /* lijnen per positie: dunner, er staan er meer tegelijk */
+.chart-svg .line.dashed { stroke-dasharray: 5 4; stroke-width: 1.25px; }
 .chart-svg .s-value { stroke: var(--s-value); }
 .chart-svg .s-invested { stroke: var(--s-invested); }
 .chart-svg .s-bench { stroke: var(--s-bench); }
